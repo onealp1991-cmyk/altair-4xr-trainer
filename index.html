@@ -864,6 +864,32 @@ function loop() {
 show({ icons: S(), r1: '', r2: '' });
 requestAnimationFrame(loop);
 
+/* ?demo=<state> puts the unit straight into a screen (used for slide screenshots and quick demos) */
+{
+  const demo = new URLSearchParams(location.search).get('demo');
+  if (demo) {
+    const c = CONFIG.sensors;
+    const on = () => { dev.power = true; dev.mode = 'normal'; dev.page = 'main'; dev.poweredAt = now(); dev.lastOpBeep = now(); dev.lastMotion = now(); settings.sound = false; settings.vib = false; };
+    const still = (scr) => { dev.power = true; dev.mode = 'demo'; dev.seqId++; show(scr); };
+    switch (demo) {
+      case 'off': break;
+      case 'selftest': still({ allOn: true, icons: S('warn','peak','min','bt','gas','nogas','hour','check','motion','stel','twa','bat'), flags: S('lel','o2','so2','co','no2','h2s') }); break;
+      case 'msa': still({ icons: S('bat'), ...T('MSA', '') }); break;
+      case 'lowalarms': still({ icons: S('bat','warn','min'), flags: S('lel','o2','co','h2s'), r1: row1(String(c.lel.low), c.o2.low.toFixed(1)), r2: row2(String(c.co.low), String(c.h2s.low)) }); break;
+      case 'fas': still({ icons: S('bat','nogas'), flags: S('lel','o2','co','h2s'), r1: center('FAS?', 6), r2: '' }); break;
+      case 'main': on(); settings.bumpedAt = now(); break;
+      case 'bump': still({ icons: S('bat','gas'), flags: S('lel','o2','co','h2s'), r1: center('bUMP', 6), r2: center('TEST?', 7) }); break;
+      case 'bumppass': still({ icons: S('bat','check'), r1: center('bUMP', 6), r2: center('PASS', 7) }); break;
+      case 'zero': still({ icons: S('bat','nogas'), flags: S('lel','o2','co','h2s'), r1: center('ZERO', 6), r2: center('CAL?', 7) }); break;
+      case 'span': still({ icons: S('bat','gas'), flags: S('lel','o2','co','h2s'), r1: center('SPAN', 6), r2: center('CAL?', 7) }); break;
+      case 'alarm': on(); dev.atm = { lel: 0, o2: 20.8, co: 140, h2s: 0 }; dev.read.co = 140; dev.suppressUntil = 0; break;
+      case 'lel': on(); dev.atm = { lel: 12, o2: 20.8, co: 0, h2s: 0 }; dev.read.lel = 12; dev.suppressUntil = 0; break;
+      case 'lowbatt': still({ icons: S('bat','warn'), battery: 1, blink: S('bat'), r1: center('LOW', 6), r2: center('BATT', 7) }); break;
+    }
+    if (new URLSearchParams(location.search).get('bare')) { document.getElementById('chrome').style.display = 'none'; document.getElementById('scn').style.display = 'none'; document.getElementById('device').style.filter = 'none'; }
+  }
+}
+
 /* =====================================================================
    Side chrome: help + settings
    ===================================================================== */
