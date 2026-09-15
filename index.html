@@ -1,0 +1,886 @@
+<title>ALTAIR 4XR Trainer</title>
+<meta name="theme-color" content="#0f1113">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap">
+<style>
+:root{
+  --ground:#0f1113; --ground-2:#171a1d; --ink:#e6e8e3; --ink-dim:#9aa09a; --line:#2a2f33;
+  --body:#2b2e30; --body-2:#1e2123; --body-3:#3a3e41; --rubber:#161819;
+  --lcd:#c4cdb2; --lcd-lit:#cfdad0; --seg:#141513; --seg-off:rgba(20,22,18,.045);
+  --msa-blue:#1d5fb5; --led-red:#ff2b2b; --led-green:#3ddc6a; --led-yellow:#ffc73a; --led-blue:#4aa8ff;
+  --accent:#e8b23a;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:Barlow,"Segoe UI",system-ui,sans-serif;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding-inline:16px;padding-block:8px}
+#stage{height:100%;max-height:100dvh;width:100%;display:flex;align-items:center;justify-content:center}
+#device{height:min(100%,100dvh);max-width:100%;aspect-ratio:340/640;touch-action:none;filter:drop-shadow(0 18px 30px rgba(0,0,0,.6))}
+.btn{cursor:pointer}
+.btn:active .cap, .btn.down .cap{fill:#111}
+.seg{fill:var(--seg-off)}
+.seg.on{fill:var(--seg)}
+.flag rect{fill:var(--seg-off)} .flag text{fill:transparent;font:700 11px "Barlow Condensed",Barlow,sans-serif;letter-spacing:.3px}
+.flag.on rect{fill:var(--seg)} .flag.on text{fill:var(--lcd)}
+.ico{fill:var(--seg-off);stroke:var(--seg-off)}
+.ico.on{fill:var(--seg);stroke:var(--seg)}
+.ico :not(.stroke){stroke:none}
+.ico .stroke,.ico.stroke{fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.ico.stroke{stroke:var(--seg-off)}
+.ico.stroke.on{stroke:var(--seg)}
+.hidden{visibility:hidden}
+#lcdbg{fill:var(--lcd);transition:fill .25s}
+#lcdbg.lit{fill:var(--lcd-lit)}
+#lcdlight{opacity:0;transition:opacity .25s}
+#lcdlight.lit{opacity:1}
+.led{opacity:.18;transition:opacity .08s}
+.led.on{opacity:1}
+#led-bump.on-green{fill:var(--led-green);opacity:1}
+#led-bump.on-red{fill:var(--led-red);opacity:1}
+/* scenario chip (bottom-left) */
+#scn{position:fixed;left:10px;bottom:10px;z-index:5;display:flex;flex-direction:column;gap:6px;max-width:min(62vw,300px)}
+#btn-scn{align-self:flex-start;background:var(--ground-2);border:1px solid var(--line);color:var(--ink-dim);height:40px;padding:0 14px;border-radius:8px;font:600 14px Barlow,sans-serif;cursor:pointer;-webkit-user-select:none;user-select:none;touch-action:none}
+#btn-scn.active{background:var(--accent);border-color:var(--accent);color:#1a1405}
+#btn-scn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#scn-caption{background:var(--ground-2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font:500 13.5px Barlow,sans-serif;color:var(--ink);line-height:1.35}
+#scn-caption b{display:block;color:var(--accent);font-weight:700}
+#scn-caption span{color:var(--ink-dim)}
+#scn-reveal{background:#1f1a0c;border:1px solid var(--accent);border-radius:8px;padding:8px 12px;font:500 13.5px Barlow,sans-serif;color:var(--ink);line-height:1.4;cursor:pointer}
+#scn-reveal b:first-child{display:block;color:var(--accent);font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:2px}
+/* side chrome */
+#chrome{position:fixed;right:10px;bottom:10px;display:flex;gap:8px;z-index:5}
+#chrome button{background:var(--ground-2);border:1px solid var(--line);color:var(--ink-dim);width:40px;height:40px;border-radius:8px;font:600 15px Barlow,sans-serif;cursor:pointer}
+#chrome button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sheet{position:fixed;inset:auto 0 0 0;max-height:78dvh;overflow:auto;background:var(--ground-2);border-top:1px solid var(--line);
+  padding:18px 20px 28px;z-index:10;transform:translateY(102%);transition:transform .25s;box-shadow:0 -10px 40px rgba(0,0,0,.5)}
+.sheet.open{transform:none}
+.sheet h2{font:700 13px "Barlow Condensed",sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 12px}
+.sheet h3{font:600 15px Barlow,sans-serif;margin:16px 0 6px}
+.sheet p,.sheet li{font-size:14.5px;line-height:1.45;color:var(--ink);margin:0}
+.sheet ul{margin:0;padding-left:18px}
+.sheet .row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+.sheet label{font-size:14.5px}
+.sheet input[type=date],.sheet input[type=range]{accent-color:var(--accent)}
+.sheet input[type=date]{background:var(--ground);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:inherit}
+.sheet .close{position:absolute;right:14px;top:10px;background:none;border:0;color:var(--ink-dim);font-size:22px;cursor:pointer}
+.sheet .k{display:inline-block;min-width:22px;text-align:center;border:1px solid var(--line);border-radius:5px;padding:0 5px;font:600 13px Barlow,sans-serif;color:var(--accent)}
+.sheet small{color:var(--ink-dim)}
+#factor-table{border-collapse:collapse;width:100%;margin-top:8px;font-variant-numeric:tabular-nums;font-size:14px}
+#factor-table th,#factor-table td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line)}
+#factor-table th:not(:first-child),#factor-table td:not(:first-child){text-align:right}
+#factor-table th{font:700 11px 'Barlow Condensed',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim)}
+.sheet .toggle{width:44px;height:26px;appearance:none;background:var(--line);border-radius:13px;position:relative;cursor:pointer;margin:0}
+.sheet .toggle:checked{background:var(--accent)}
+.sheet .toggle::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .15s}
+.sheet .toggle:checked::after{left:21px}
+.sheet .gas{display:grid;grid-template-columns:64px 1fr 56px;gap:10px;align-items:center;padding:6px 0;font-variant-numeric:tabular-nums}
+.sheet .gas output{text-align:right;font-weight:600}
+details summary{cursor:pointer;color:var(--ink-dim);font-size:14px;margin-top:14px}
+@media (prefers-reduced-motion:reduce){.sheet{transition:none}}
+</style>
+
+<div id="stage">
+<svg id="device" viewBox="0 0 340 640" xmlns="http://www.w3.org/2000/svg" aria-label="MSA ALTAIR 4XR simulator">
+  <defs>
+    <linearGradient id="faceg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b3f42"/><stop offset="0.5" stop-color="#2f3336"/><stop offset="1" stop-color="#26292b"/></linearGradient>
+    <linearGradient id="lens" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#c9ccc9"/></linearGradient>
+    <linearGradient id="cornerg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e3e5e2"/><stop offset="1" stop-color="#b4b8b5"/></linearGradient>
+    <radialGradient id="capg" cx="0.5" cy="0.35" r="0.8"><stop offset="0" stop-color="#454a4d"/><stop offset="1" stop-color="#1c1e20"/></radialGradient>
+    <linearGradient id="badgeg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a6fd0"/><stop offset="1" stop-color="#174e9e"/></linearGradient>
+    <filter id="ledglow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="5"/></filter>
+    <linearGradient id="backlit" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eaf6ff" stop-opacity="0.85"/><stop offset="0.12" stop-color="#dceefb" stop-opacity="0.45"/><stop offset="1" stop-color="#d8e6ef" stop-opacity="0.25"/></linearGradient>
+    <clipPath id="bodyclip"><path d="M64 12 H276 Q334 12 334 70 V566 Q334 628 272 628 H68 Q6 628 6 566 V70 Q6 12 64 12 Z"/></clipPath>
+  </defs>
+
+  <!-- rubber shell -->
+  <path d="M64 12 H276 Q334 12 334 70 V566 Q334 628 272 628 H68 Q6 628 6 566 V70 Q6 12 64 12 Z" fill="#111213"/>
+  <!-- front face -->
+  <path d="M70 22 H270 Q324 22 324 76 V560 Q324 618 266 618 H74 Q16 618 16 560 V76 Q16 22 70 22 Z" fill="url(#faceg)"/>
+
+  <!-- alarm LEDs behind translucent corner lenses -->
+  <g clip-path="url(#bodyclip)">
+    <circle class="led red" cx="44" cy="52" r="26" fill="var(--led-red)" filter="url(#ledglow)"/>
+    <circle class="led red" cx="296" cy="52" r="26" fill="var(--led-red)" filter="url(#ledglow)"/>
+    <circle class="led red" cx="44" cy="588" r="26" fill="var(--led-red)" filter="url(#ledglow)"/>
+    <circle class="led red" cx="296" cy="588" r="26" fill="var(--led-red)" filter="url(#ledglow)"/>
+  </g>
+  <g fill="url(#cornerg)" opacity="0.82">
+    <path d="M16 96 V76 Q16 22 70 22 H104 Q60 34 40 96 Z"/>
+    <path d="M324 96 V76 Q324 22 270 22 H236 Q280 34 300 96 Z"/>
+    <path d="M16 544 V560 Q16 618 74 618 H108 Q64 606 40 544 Z"/>
+    <path d="M324 544 V560 Q324 618 266 618 H232 Q276 606 300 544 Z"/>
+  </g>
+
+  <!-- side rubber ribs -->
+  <g fill="#0d0e0f">
+    <rect x="-2" y="296" width="30" height="24" rx="6"/><rect x="-2" y="334" width="30" height="24" rx="6"/><rect x="-2" y="372" width="30" height="24" rx="6"/><rect x="-2" y="410" width="30" height="24" rx="6"/><rect x="-2" y="448" width="30" height="24" rx="6"/>
+    <rect x="312" y="296" width="30" height="24" rx="6"/><rect x="312" y="334" width="30" height="24" rx="6"/><rect x="312" y="372" width="30" height="24" rx="6"/><rect x="312" y="410" width="30" height="24" rx="6"/><rect x="312" y="448" width="30" height="24" rx="6"/>
+  </g>
+
+  <!-- green bump LED lens (top right shoulder) -->
+  <path d="M238 28 Q276 26 296 50 L274 66 Q262 48 236 46 Z" fill="#2c9a48"/>
+  <circle id="led-bump" class="led" cx="266" cy="46" r="9" fill="var(--led-green)" filter="url(#ledglow)"/>
+  <!-- fault + bluetooth status LEDs (dark until lit) -->
+  <circle id="led-fault" class="led" cx="112" cy="70" r="4" fill="var(--led-yellow)" filter="url(#ledglow)"/>
+  <circle id="led-bt" class="led" cx="62" cy="184" r="3.5" fill="var(--led-blue)" filter="url(#ledglow)"/>
+
+  <!-- sensor head: centre window with louvres + two side lenses -->
+  <rect x="126" y="38" width="88" height="104" rx="12" fill="#0c0d0e"/>
+  <rect x="134" y="46" width="72" height="88" rx="9" fill="url(#lens)"/>
+  <g fill="#9ea3a1"><rect x="140" y="66" width="60" height="7" rx="2"/><rect x="140" y="86" width="60" height="7" rx="2"/><rect x="140" y="106" width="60" height="7" rx="2"/></g>
+  <rect x="60" y="92" width="56" height="56" rx="9" fill="#0c0d0e"/><rect x="67" y="99" width="42" height="42" rx="6" fill="url(#lens)"/>
+  <rect x="224" y="92" width="56" height="56" rx="9" fill="#0c0d0e"/><rect x="231" y="99" width="42" height="42" rx="6" fill="url(#lens)"/>
+
+  <!-- horn slot -->
+  <rect x="148" y="156" width="44" height="26" rx="7" fill="#0b0c0c"/>
+  <ellipse cx="170" cy="169" rx="10" ry="5.5" fill="#000"/>
+
+  <!-- button pad -->
+  <path d="M74 190 H266 Q292 190 292 216 V272 Q292 298 266 298 H214 Q202 298 196 310 Q188 330 170 330 Q152 330 144 310 Q138 298 126 298 H74 Q48 298 48 272 V216 Q48 190 74 190 Z" fill="#161819"/>
+  <g id="btn-down" class="btn" role="button" aria-label="Down arrow button">
+    <rect class="cap" x="60" y="200" width="82" height="76" rx="16" fill="url(#capg)"/>
+    <polyline points="84,228 101,246 118,228" fill="none" stroke="#d9dbd8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g id="btn-up" class="btn" role="button" aria-label="Up arrow button">
+    <rect class="cap" x="198" y="200" width="82" height="76" rx="16" fill="url(#capg)"/>
+    <polyline points="222,246 239,228 256,246" fill="none" stroke="#d9dbd8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g id="btn-power" class="btn" role="button" aria-label="Power button">
+    <circle class="cap" cx="170" cy="288" r="28" fill="url(#capg)"/>
+    <path d="M160 279 a13.5 13.5 0 1 0 20 0" fill="none" stroke="#d9dbd8" stroke-width="4" stroke-linecap="round"/>
+    <line x1="170" y1="274" x2="170" y2="288" stroke="#d9dbd8" stroke-width="4" stroke-linecap="round"/>
+  </g>
+
+  <!-- LCD window -->
+  <rect x="54" y="344" width="232" height="230" rx="10" fill="#0a0b0b"/>
+  <svg id="lcd" x="61" y="351" width="218" height="216" viewBox="0 0 300 300" preserveAspectRatio="none">
+    <rect id="lcdbg" x="0" y="0" width="300" height="300" rx="6"/>
+    <rect id="lcdlight" x="0" y="0" width="300" height="300" rx="6" fill="url(#backlit)"/>
+    <g id="lcd-content"></g>
+  </svg>
+
+  <!-- badge -->
+  <rect x="72" y="584" width="196" height="26" rx="5" fill="url(#badgeg)"/>
+  <text x="86" y="602" fill="#fff" font-family="Barlow Condensed, Barlow, sans-serif" font-weight="700" font-size="14" letter-spacing=".6">MSA</text>
+  <rect x="118" y="589" width="1.5" height="16" fill="rgba(255,255,255,.55)"/>
+  <text x="126" y="602" fill="#fff" font-family="Barlow Condensed, Barlow, sans-serif" font-weight="700" font-size="14" letter-spacing=".8">ALTAIR</text>
+  <rect x="180" y="588" width="40" height="18" rx="9" fill="#fff"/>
+  <text x="200" y="601.5" text-anchor="middle" fill="#174e9e" font-family="Barlow Condensed, Barlow, sans-serif" font-weight="700" font-size="13" font-style="italic">4XR</text>
+  <circle cx="238" cy="597" r="7" fill="#fff"/><path d="M235.5 593 l5 4 -5 4 M238 592 v10 M235.5 601 l5 -4 -5 -4" fill="none" stroke="#174e9e" stroke-width="1.4" stroke-linejoin="round"/>
+</svg>
+</div>
+
+<div id="chrome">
+  <button id="btn-help" aria-label="Help">?</button>
+  <button id="btn-settings" aria-label="Settings">⚙</button>
+</div>
+<div id="scn">
+  <button id="btn-scn" aria-label="Cycle classroom scenario">Scenario</button>
+  <div id="scn-caption" hidden></div>
+  <div id="scn-reveal" hidden></div>
+</div>
+
+<section id="help" class="sheet" aria-label="Help">
+  <button class="close" data-close="help" aria-label="Close">×</button>
+  <h2>ALTAIR 4XR Trainer</h2>
+  <p>Press the power button to start. The unit runs the real startup sequence (timed from MSA's own video), then flashes FAS? for 10 seconds.</p>
+  <h3>Buttons in normal mode</h3>
+  <ul>
+    <li><b>⏻</b> confirm. Hold 5 s to power off.</li>
+    <li><b>▼</b> next page: BUMP TEST? → PEAK → MIN → STEL → TWA → TIME → DATE → dSCVRY → MOTION. Hold 3 s for InstantAlert.</li>
+    <li><b>▲</b> reset the value on PEAK / MIN / STEL / TWA pages, acknowledge or silence alarms. Hold 3 s to enter calibration (ZERO CAL? then SPAN CAL?).</li>
+  </ul>
+  <h3>Bump test</h3>
+  <p>▼ once to bUMP TEST?, then ⏻. The sim applies cal gas for you (58 % LEL, 15.0 % O2, 60 ppm CO, 20 ppm H2S). The readings climb, then bUMP PASS and the ✓ stays on the main page for 24 h. ▲ backs out.</p>
+  <h3>Calibration</h3>
+  <p>Hold ▲ 3 s for ZERO CAL?. ⏻ runs SENSOR REFRSH, zeroes in fresh air (ZERO PASS), then SPAN CAL? alternates with the cal-gas values. ⏻ spans with gas (SPAN PASS) and the LAST CAL date updates. ▼ skips either step. 30 s of no input returns to normal.</p>
+  <h3>Classroom scenarios</h3>
+  <p>The <b>Scenario</b> button (bottom left) cycles through five atmospheres. Each names the known gas; the meter shows the reading. Students find the gas in the chart below and multiply: <b>true % LEL = displayed % LEL &times; factor</b>. Hold the Scenario button to reveal the answer. Tap it again after the last one to return to fresh air.</p>
+  <details><summary>Conversion factors (manual section 5.2, page 47)</summary>
+  <p><small>Multiply the displayed % LEL by the factor. Pentane column applies to units calibrated on the 58 % LEL pentane simulant (the default here); methane column for units calibrated to 33 % LEL methane. MSA notes individual units may vary by &plusmn;25 %.</small></p>
+  <table id="factor-table"><thead><tr><th>Gas</th><th>Pentane cal</th><th>Methane cal</th></tr></thead><tbody></tbody></table>
+  </details>
+  <h3>Keyboard</h3>
+  <p><span class="k">←</span> ▼ &nbsp; <span class="k">→</span> ▲ &nbsp; <span class="k">Enter</span> ⏻ (hold works the same) &nbsp; <span class="k">S</span> next scenario &nbsp; <span class="k">A</span> reveal answer.</p>
+  <p><small>Behaviour follows the MSA ALTAIR 4XR Operating Manual (10175896/00). Factory alarm setpoints. Training use only.</small></p>
+</section>
+
+<section id="settings" class="sheet" aria-label="Settings">
+  <button class="close" data-close="settings" aria-label="Close">×</button>
+  <h2>Settings</h2>
+  <div class="row"><label for="s-sound">Horn sound</label><input class="toggle" type="checkbox" id="s-sound" checked></div>
+  <div class="row"><label for="s-vib">Vibration</label><input class="toggle" type="checkbox" id="s-vib" checked></div>
+  <div class="row"><label for="s-beep">Operating beep every 30 s</label><input class="toggle" type="checkbox" id="s-beep" checked></div>
+  <div class="row"><label for="s-bt">Bluetooth icon</label><input class="toggle" type="checkbox" id="s-bt"></div>
+  <div class="row"><label for="s-caldue">Show CAL DUE at startup</label><input class="toggle" type="checkbox" id="s-caldue"></div>
+  <div class="row"><label for="s-methane">Methane-calibrated unit (33 % LEL) instead of pentane (58 % LEL)</label><input class="toggle" type="checkbox" id="s-methane"></div>
+  <div class="row"><label for="s-lastcal">Last calibration date</label><input type="date" id="s-lastcal"></div>
+  <div class="row"><label for="s-clearbump">Bump status</label><button id="s-clearbump" style="background:var(--ground);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:6px 10px;font:inherit;cursor:pointer">Clear ✓ (make bump overdue)</button></div>
+  <details>
+    <summary>Advanced: apply gas by hand</summary>
+    <p><small>Drives the atmosphere the sensors see. Leave at fresh air unless you want to demo an alarm.</small></p>
+    <div class="gas"><label for="g-lel">LEL %</label><input type="range" id="g-lel" min="0" max="100" step="1" value="0"><output id="o-lel">0</output></div>
+    <div class="gas"><label for="g-o2">O2 %</label><input type="range" id="g-o2" min="0" max="30" step="0.1" value="20.8"><output id="o-o2">20.8</output></div>
+    <div class="gas"><label for="g-co">CO ppm</label><input type="range" id="g-co" min="0" max="2100" step="1" value="0"><output id="o-co">0</output></div>
+    <div class="gas"><label for="g-h2s">H2S ppm</label><input type="range" id="g-h2s" min="0" max="220" step="1" value="0"><output id="o-h2s">0</output></div>
+    <div class="row"><label>Reset to fresh air</label><button id="g-fresh" style="background:var(--ground);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:6px 10px;font:inherit;cursor:pointer">Fresh air</button></div>
+  </details>
+</section>
+
+<script>
+/* =====================================================================
+   CONFIG — everything a department might change lives here
+   ===================================================================== */
+const CONFIG = {
+  fw: { rev: 'R 2.00', fcc: ['FCC T7', 'V 13 16'], ic: ['IC 216', 'Q-1316'], bt: 'R 1.05' },
+  gasType: 'PENTAN',                       // LEL / PENTAN  (or METHAN, BUTANE) -- set by the calibration setting
+  // Combustible gas cross-reference factors, ALTAIR 4XR manual section 5.2 (page 47).
+  // True % LEL = displayed % LEL x factor. 'pentane' = unit calibrated to 58 % LEL pentane simulant, 'methane' = 33 % LEL methane.
+  factors: {
+    'Acetone': { pentane: 0.62, methane: 1.09 }, 'Acetylene': { pentane: 0.61, methane: 1.07 }, 'Butane': { pentane: 0.79, methane: 1.37 },
+    'Cyclohexane': { pentane: 1.11, methane: 1.94 }, 'Diethyl ether': { pentane: 0.82, methane: 1.43 }, 'Ethane': { pentane: 0.73, methane: 1.27 },
+    'Ethanol': { pentane: 0.66, methane: 1.16 }, 'Ethylene': { pentane: 0.62, methane: 1.09 }, 'Gasoline': { pentane: 0.93, methane: 1.63 },
+    'n-Hexane': { pentane: 1.06, methane: 1.86 }, 'Hydrogen': { pentane: 0.56, methane: 0.98 }, 'Isobutane': { pentane: 0.93, methane: 1.63 },
+    'Isopropyl alcohol': { pentane: 0.88, methane: 1.55 }, 'Methane': { pentane: 0.57, methane: 1.00 }, 'Methanol': { pentane: 0.53, methane: 0.93 },
+    'Methyl ethyl ketone': { pentane: 0.97, methane: 1.69 }, 'Nonane': { pentane: 2.56, methane: 4.48 }, 'Pentane': { pentane: 1.00, methane: 1.90 },
+    'Propane': { pentane: 0.79, methane: 1.39 }, 'Toluene': { pentane: 0.93, methane: 1.14 }, 'Xylene': { pentane: 1.19, methane: 2.09 },
+  },
+  // Classroom scenarios: the meter shows `lel`; students look up the gas in the chart and compute the true % LEL.
+  scenarios: [
+    { gas: 'Gasoline',  hint: 'Fuel spill in a garage',            lel: 12, o2: 20.8, co: 0, h2s: 0 },
+    { gas: 'Propane',   hint: 'BBQ cylinder leak on a patio',      lel: 9,  o2: 20.8, co: 0, h2s: 0 },
+    { gas: 'Hydrogen',  hint: 'Forklift battery charging room',    lel: 16, o2: 20.7, co: 0, h2s: 0 },
+    { gas: 'Nonane',    hint: 'Diesel / kerosene vapor in a shed', lel: 7,  o2: 20.8, co: 0, h2s: 0 },
+    { gas: 'Methane',   hint: 'Natural gas odor in a kitchen',     lel: 18, o2: 20.6, co: 0, h2s: 0 },
+  ],
+  horn: { f1: 3300, t1: 400, f2: 3550, t2: 400 },   // self-test two-tone, measured from MSA's video
+  sensors: {
+    lel: { low: 10,   high: 20,   cal: 58,   max: 100,  dec: 0, tau: 4.5 },
+    o2:  { low: 19.5, high: 23.0, cal: 15.0, max: 30,   dec: 1, tau: 3.5, fresh: 20.8 },
+    co:  { low: 25,   high: 100,  stel: 100, twa: 25, cal: 60, max: 1999, dec: 0, tau: 5 },
+    h2s: { low: 10,   high: 15,   stel: 15,  twa: 10, cal: 20, max: 200,  dec: 0, tau: 5 },
+  },
+  t: {
+    holdOn: 250, holdOff: 5000, holdCal: 3000, holdAlert: 3000,
+    selfTest: 4000, splash: 3000, fasWindow: 10000, fasRun: 9000,
+    pageTimeout: 30000, calTimeout: 30000, refreshRun: 8000, zeroRun: 4000, resultShow: 2500,
+    bumpMin: 8000, bumpMax: 45000, spanMin: 12000, spanMax: 60000,
+    opBeep: 30000, bumpLed: 15000, bumpValid: 24 * 3600 * 1000, silence: 5000,
+    motionPre: 20000, motionFull: 30000, purge: 12000,
+  },
+};
+
+/* =====================================================================
+   14-segment LCD renderer
+   ===================================================================== */
+const SEGS = ['a','b','c','d','e','f','g1','g2','h','i','j','k','l','m'];
+const GLYPH = {
+  'A':'a b c e f g1 g2','B':'a b c d i l g2','C':'a d e f','D':'a b c d i l','E':'a d e f g1 g2','F':'a e f g1',
+  'G':'a c d e f g2','H':'b c e f g1 g2','I':'a d i l','J':'b c d e','K':'e f g1 j m','L':'d e f','M':'b c e f h j',
+  'N':'b c e f h m','O':'a b c d e f','P':'a b e f g1 g2','Q':'a b c d e f m','R':'a b e f g1 g2 m','S':'a c d f g1 g2',
+  'T':'a i l','U':'b c d e f','V':'e f k j','W':'b c e f k m','X':'h j k m','Y':'h j l','Z':'a d j k',
+  '0':'a b c d e f','1':'b c','2':'a b d e g1 g2','3':'a b c d g2','4':'b c f g1 g2','5':'a c d f g1 g2','6':'a c d e f g1 g2',
+  '7':'a b c','8':'a b c d e f g1 g2','9':'a b c d f g1 g2','-':'g1 g2','+':'g1 g2 i l','?':'a b g2 l','_':'d',' ':'',
+  'd':'b c d e g1 g2',   // lowercase d for dSCVRY, as on the real unit
+  'b':'c d e f g1 g2',   // lowercase b for bT SW, as on the real unit
+};
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent) { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; }
+
+function segPolys(w, h) {
+  const t = Math.max(6, w * 0.16), g = 1.4, L = t/2+1, R = w - t/2 - 1, T = t/2+1, B = h - t/2 - 1, M = h/2, C = w/2;
+  const hseg = (x1,x2,y) => [[x1,y],[x1+t/2,y-t/2],[x2-t/2,y-t/2],[x2,y],[x2-t/2,y+t/2],[x1+t/2,y+t/2]];
+  const vseg = (x,y1,y2) => [[x,y1],[x+t/2,y1+t/2],[x+t/2,y2-t/2],[x,y2],[x-t/2,y2-t/2],[x-t/2,y1+t/2]];
+  const diag = (x1,y1,x2,y2) => { const dx=x2-x1, dy=y2-y1, len=Math.hypot(dx,dy), nx=-dy/len*t*0.36, ny=dx/len*t*0.36; return [[x1+nx,y1+ny],[x2+nx,y2+ny],[x2-nx,y2-ny],[x1-nx,y1-ny]]; };
+  return {
+    a: hseg(L+g, R-g, T), d: hseg(L+g, R-g, B), g1: hseg(L+g, C-g, M), g2: hseg(C+g, R-g, M),
+    b: vseg(R, T+g, M-g), c: vseg(R, M+g, B-g), e: vseg(L, M+g, B-g), f: vseg(L, T+g, M-g),
+    i: vseg(C, T+g, M-g), l: vseg(C, M+g, B-g),
+    h: diag(L+t*0.9, T+t*0.9, C-t*0.8, M-t*0.8), j: diag(R-t*0.9, T+t*0.9, C+t*0.8, M-t*0.8),
+    k: diag(L+t*0.9, B-t*0.9, C-t*0.8, M+t*0.8), m: diag(R-t*0.9, B-t*0.9, C+t*0.8, M+t*0.8),
+  };
+}
+
+class Row {
+  constructor(parent, x, y, n, w, h, pitch, gapAfter = -1, gap = 0) {
+    this.n = n; this.cells = [];
+    const polys = segPolys(w, h);
+    for (let i = 0; i < n; i++) {
+      const g = el('g', { transform: `translate(${x + i*pitch + (gapAfter >= 0 && i > gapAfter ? gap : 0)},${y})` }, parent);
+      const segs = {};
+      for (const s of SEGS) segs[s] = el('polygon', { class: 'seg', points: polys[s].map(p => p.join(',')).join(' ') }, g);
+      const dp = el('circle', { class: 'seg', cx: w + 3.2, cy: h - 3.5, r: Math.max(3, w*0.085) }, g);
+      const col1 = el('circle', { class: 'seg', cx: w/2, cy: h*0.3, r: Math.max(3, w*0.085) }, g);
+      const col2 = el('circle', { class: 'seg', cx: w/2, cy: h*0.7, r: Math.max(3, w*0.085) }, g);
+      this.cells.push({ g, segs, dp, col1, col2 });
+    }
+  }
+  // text: string where '.' lights the previous cell's decimal point and ':' is a colon cell
+  set(text, hidden) {
+    const cells = [];
+    for (const ch of (text || '')) {
+      if (ch === '.' && cells.length && !cells[cells.length-1].colon) cells[cells.length-1].dp = true;
+      else if (ch === ':') cells.push({ ch: ' ', colon: true });
+      else cells.push({ ch: (ch === 'd' || ch === 'b') ? ch : ch.toUpperCase() });
+    }
+    for (let i = 0; i < this.n; i++) {
+      const c = cells[i] || { ch: ' ' }, cell = this.cells[i];
+      const on = new Set(((GLYPH[c.ch] ?? GLYPH[c.ch.toUpperCase()]) ?? '').split(' ').filter(Boolean));
+      for (const s of SEGS) cell.segs[s].classList.toggle('on', on.has(s));
+      cell.dp.classList.toggle('on', !!c.dp);
+      cell.col1.classList.toggle('on', !!c.colon); cell.col2.classList.toggle('on', !!c.colon);
+      cell.g.classList.toggle('hidden', !!(hidden && hidden.has(i)));
+    }
+  }
+  all(onoff) { for (const cell of this.cells) { for (const s of SEGS) cell.segs[s].classList.toggle('on', onoff); cell.dp.classList.toggle('on', onoff); cell.col1.classList.toggle('on', onoff); cell.col2.classList.toggle('on', onoff); cell.g.classList.remove('hidden'); } }
+}
+
+/* ---------- build the LCD ---------- */
+const lcdRoot = document.getElementById('lcd-content');
+const ICONS = {};
+const LCD = {};
+function icon(name, node) { node.classList.add('ico'); ICONS[name] = node; return node; }
+(function buildLCD() {
+  // left column: alarm, peak, min
+  const warn = el('g', {}, lcdRoot);
+  el('polygon', { points: '14,6 26,28 2,28' }, warn); el('rect', { x: 12.6, y: 12, width: 2.8, height: 8, fill: 'var(--lcd)' }, warn); el('circle', { cx: 14, cy: 24, r: 1.6, fill: 'var(--lcd)' }, warn);
+  icon('warn', warn);
+  icon('peak', el('polygon', { points: '14,34 26,48 2,48' }, lcdRoot));
+  icon('min', el('polygon', { points: '2,54 26,54 14,68' }, lcdRoot));
+  // bluetooth
+  icon('bt', el('path', { class: 'stroke', d: 'M40 12 L52 22 L40 32 L40 12 L40 52 L52 42 L40 32 M32 20 L52 42 M32 44 L52 22', 'stroke-width': 2.6 }, lcdRoot));
+  // cylinder (cal gas) + no-gas slash
+  const cyl = el('g', {}, lcdRoot);
+  el('rect', { x: 56, y: 50, width: 34, height: 14, rx: 3 }, cyl); el('rect', { x: 90, y: 54, width: 6, height: 6 }, cyl); el('rect', { x: 96, y: 52, width: 4, height: 10 }, cyl);
+  icon('gas', cyl);
+  icon('nogas', el('line', { class: 'stroke', x1: 54, y1: 68, x2: 100, y2: 46, 'stroke-width': 3.4 }, lcdRoot));
+  // hourglass
+  icon('hour', el('path', { d: 'M100 10 h22 v5 l-8 11 l8 11 v5 h-22 v-5 l8 -11 l-8 -11 z' }, lcdRoot));
+  // check circle
+  const chk = el('g', {}, lcdRoot);
+  el('circle', { class: 'stroke', cx: 150, cy: 38, r: 24, 'stroke-width': 4.5 }, chk); el('path', { class: 'stroke', d: 'M137 39 l9 9 l18 -20', 'stroke-width': 5 }, chk);
+  chk.classList.add('ico'); ICONS.check = chk;
+  // motion alert
+  const mot = el('g', {}, lcdRoot);
+  el('polygon', { points: '200,26 212,48 188,48' }, mot); el('rect', { x: 198.6, y: 32, width: 2.8, height: 8, fill: 'var(--lcd)' }, mot); el('circle', { cx: 200, cy: 44, r: 1.6, fill: 'var(--lcd)' }, mot);
+  el('path', { class: 'stroke', d: 'M182 28 q-6 9 0 18 M218 28 q6 9 0 18', 'stroke-width': 3 }, mot);
+  icon('motion', mot);
+  // STEL / TWA clocks
+  const stel = el('g', {}, lcdRoot); el('circle', { class: 'stroke', cx: 232, cy: 52, r: 8, 'stroke-width': 2.4 }, stel); el('path', { class: 'stroke', d: 'M232 47 v5 h4', 'stroke-width': 2.2 }, stel);
+  el('text', { x: 243, y: 56, 'font-size': 9, 'font-family': 'Barlow Condensed, sans-serif', 'font-weight': 700 }, stel).textContent = 'STEL';
+  stel.classList.add('ico'); ICONS.stel = stel;
+  const twa = el('g', {}, lcdRoot); el('circle', { class: 'stroke', cx: 232, cy: 72, r: 8, 'stroke-width': 2.4 }, twa); el('path', { class: 'stroke', d: 'M232 67 v5 h4', 'stroke-width': 2.2 }, twa);
+  el('text', { x: 243, y: 76, 'font-size': 9, 'font-family': 'Barlow Condensed, sans-serif', 'font-weight': 700 }, twa).textContent = 'TWA';
+  twa.classList.add('ico'); ICONS.twa = twa;
+  // battery (outline + 4 bars)
+  const bat = el('g', {}, lcdRoot);
+  el('rect', { class: 'stroke', x: 246, y: 10, width: 42, height: 20, rx: 2, 'stroke-width': 2.6 }, bat); el('rect', { x: 288, y: 15, width: 5, height: 10 }, bat);
+  bat.classList.add('ico'); ICONS.bat = bat;
+  ICONS.batBars = [0,1,2,3].map(i => el('rect', { class: 'seg', x: 250 + i*9.6, y: 14, width: 8, height: 12 }, lcdRoot));
+  // sensor flags
+  function flag(name, x, y, w, label) {
+    const g = el('g', { class: 'flag' }, lcdRoot); el('rect', { x, y, width: w, height: 14, rx: 1.5 }, g);
+    const t = el('text', { x: x + w/2, y: y + 10.5, 'text-anchor': 'middle' }, g); t.textContent = label; ICONS['flag_' + name] = g;
+  }
+  flag('lel', 12, 80, 122, 'COMB/EX'); flag('o2', 166, 80, 122, 'O2');
+  flag('so2', 8, 194, 44, 'SO2'); flag('co', 60, 194, 60, 'CO'); flag('no2', 172, 194, 44, 'NO2'); flag('h2s', 228, 194, 60, 'H2S');
+  // digit rows
+  LCD.r1 = new Row(lcdRoot, 10, 100, 6, 40, 84, 47, 2, 12);
+  LCD.r2 = new Row(lcdRoot, 6, 214, 7, 34, 76, 40.5, 3, 12);
+})();
+
+/* screen model → LCD */
+const blinkOn = () => Math.floor(performance.now() / 500) % 2 === 0;
+function paint(s) {
+  const b = s.blink || new Set(), on = blinkOn();
+  const vis = (key) => !(b.has(key) && !on);
+  for (const k of ['warn','peak','min','bt','gas','nogas','hour','check','motion','stel','twa','bat']) {
+    const want = s.icons && s.icons.has(k);
+    ICONS[k].classList.toggle('on', !!want && vis(k));
+  }
+  const bars = s.battery ?? 4;
+  ICONS.batBars.forEach((r, i) => r.classList.toggle('on', s.icons && s.icons.has('bat') && i < bars && vis('bat')));
+  for (const f of ['lel','o2','so2','co','no2','h2s']) ICONS['flag_' + f].classList.toggle('on', !!(s.flags && s.flags.has(f)) && vis('flag_' + f));
+  if (s.allOn) { LCD.r1.all(true); LCD.r2.all(true); return; }
+  const hide1 = new Set(), hide2 = new Set();
+  if (b.has('r1L') && !on) [0,1,2].forEach(i => hide1.add(i));
+  if (b.has('r1R') && !on) [3,4,5].forEach(i => hide1.add(i));
+  if (b.has('r2L') && !on) [0,1,2,3].forEach(i => hide2.add(i));
+  if (b.has('r2R') && !on) [4,5,6].forEach(i => hide2.add(i));
+  if (b.has('r1') && !on) [0,1,2,3,4,5].forEach(i => hide1.add(i));
+  if (b.has('r2') && !on) [0,1,2,3,4,5,6].forEach(i => hide2.add(i));
+  LCD.r1.set(s.r1 || '', hide1); LCD.r2.set(s.r2 || '', hide2);
+}
+// helpers for composing rows
+const cellsOf = (str) => [...str].filter(c => c !== '.').length;
+function padL(str, n) { const c = cellsOf(str); return ' '.repeat(Math.max(0, n - c)) + str; }
+function padR(str, n) { const c = cellsOf(str); return str + ' '.repeat(Math.max(0, n - c)); }
+function center(str, n) { const c = cellsOf(str), left = Math.floor((n - c) / 2); return ' '.repeat(Math.max(0, left)) + str; }
+const row1 = (L, R) => padL(L, 3) + padL(R, 3);
+const row2 = (L, R) => padL(L, 4) + padL(R, 3);
+const T = (a, b) => ({ r1: center(a, 6), r2: center(b, 7) });
+const S = (...a) => new Set(a);
+
+/* =====================================================================
+   Device state
+   ===================================================================== */
+const settings = Object.assign({ sound: true, vib: true, beep: true, bt: false, caldue: false, lastCal: null, bumpedAt: 0, methaneCal: false }, load('a4xr.settings'));
+function applyCalType() { CONFIG.gasType = settings.methaneCal ? 'METHAN' : 'PENTAN'; CONFIG.sensors.lel.cal = settings.methaneCal ? 33 : 58; }
+applyCalType();
+function load(k) { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch { return {}; } }
+function save() { try { localStorage.setItem('a4xr.settings', JSON.stringify(settings)); } catch {} }
+if (!settings.lastCal) { const d = new Date(Date.now() - 7 * 864e5); settings.lastCal = d.toISOString().slice(0, 10); }
+
+const dev = {
+  power: false, mode: 'off', page: 'main', screen: { icons: S(), flags: S(), r1: '', r2: '' },
+  atm: { lel: 0, o2: 20.8, co: 0, h2s: 0 },         // what the air really is
+  gasApplied: false,                                   // sim cal gas during bump/span
+  read: { lel: 0, o2: 20.8, co: 0, h2s: 0 },         // what the sensors show (lagged)
+  peak: {}, o2min: 20.8, stelBuf: { co: [], h2s: [] }, twaSum: { co: 0, h2s: 0 }, twaN: 0,
+  alarms: {}, latched: {}, silencedUntil: 0, suppressUntil: 0, manualAlert: false, lelLock: false,
+  motionOn: false, lastMotion: 0, motionState: 0, discovery: false, discoveryUntil: 0,
+  backlightUntil: 0, poweredAt: 0, lastOpBeep: 0, lastBumpLed: 0, timers: [], seqId: 0,
+  pageIdleTimer: null, offCountdown: null,
+};
+const now = () => Date.now();
+function later(ms, fn) { const id = setTimeout(fn, ms); dev.timers.push(id); return id; }
+function clearTimers() { dev.timers.forEach(clearTimeout); dev.timers = []; }
+function show(screen) { dev.screen = Object.assign({ icons: S(), flags: S(), r1: '', r2: '' }, screen); paint(dev.screen); }
+
+/* ---------- outputs: horn, vibration, LEDs, backlight ---------- */
+let audio = null;
+function ensureAudio() { if (!audio) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch {} } if (audio && audio.state === 'suspended') audio.resume(); }
+function beep(ms = 70, freq = 3200, vol = 0.25) {
+  // piezo horn: near-pure tone with a faint 2nd harmonic (matches the spectrogram of MSA's video)
+  if (!settings.sound || !audio) return;
+  const t0 = audio.currentTime, g = audio.createGain();
+  g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(vol, t0 + 0.004); g.gain.setValueAtTime(vol, t0 + ms / 1000 - 0.004); g.gain.linearRampToValueAtTime(0, t0 + ms / 1000);
+  g.connect(audio.destination);
+  for (const [mult, amp] of [[1, 1], [2, 0.18], [3, 0.05]]) {
+    const o = audio.createOscillator(), og = audio.createGain(); o.type = 'sine'; o.frequency.value = freq * mult; og.gain.value = amp;
+    o.connect(og); og.connect(g); o.start(t0); o.stop(t0 + ms / 1000 + 0.01);
+  }
+}
+function vibrate(p) { if (settings.vib && navigator.vibrate) { try { navigator.vibrate(p); } catch {} } }
+const redLeds = [...document.querySelectorAll('.led.red')];
+function flashRed(ms = 120) { redLeds.forEach(l => l.classList.add('on')); later(ms, () => redLeds.forEach(l => l.classList.remove('on'))); }
+function backlight(ms = 10000) { dev.backlightUntil = now() + ms; }
+function chirp() { beep(60, 3000, 0.18); flashRed(90); }
+function screenChirp() { beep(130, 3200, 0.22); }
+function selfTestHorn() { beep(CONFIG.horn.t1, CONFIG.horn.f1, 0.32); later(CONFIG.horn.t1, () => beep(CONFIG.horn.t2, CONFIG.horn.f2, 0.32)); }
+
+/* ---------- readings ---------- */
+const fmt = (k, v) => { const c = CONFIG.sensors[k]; if (dev.lelLock && k === 'lel') return 'XXX'; if (v > c.max) return '+++'; if (v < -1) return '---'; return (c.dec ? v.toFixed(c.dec) : String(Math.round(Math.max(0, v)))); };
+function target(k) { const c = CONFIG.sensors[k]; if (dev.gasApplied) return c.cal; return dev.atm[k]; }
+function tickReadings(dt) {
+  for (const k in CONFIG.sensors) {
+    const c = CONFIG.sensors[k], tgt = target(k), a = 1 - Math.exp(-dt / c.tau);
+    dev.read[k] += (tgt - dev.read[k]) * a;
+  }
+  // tiny O2 wander so it looks alive
+  const o2n = dev.read.o2 + (Math.sin(now() / 4100) * 0.05);
+  const r = { lel: dev.read.lel, o2: o2n, co: dev.read.co, h2s: dev.read.h2s };
+  if (dev.read.lel >= 100) dev.lelLock = true;
+  for (const k in r) { dev.peak[k] = Math.max(dev.peak[k] ?? -Infinity, r[k]); }
+  dev.o2min = Math.min(dev.o2min, r.o2);
+  return r;
+}
+function readingsRow(r) { return { r1: row1(fmt('lel', r.lel), fmt('o2', r.o2)), r2: row2(fmt('co', r.co), fmt('h2s', r.h2s)), flags: S('lel','o2','co','h2s') }; }
+function exposureTick(r) { // once per second
+  for (const k of ['co','h2s']) { const b = dev.stelBuf[k]; b.push(Math.max(0, r[k])); if (b.length > 900) b.shift(); dev.twaSum[k] += Math.max(0, r[k]); }
+  dev.twaN++;
+}
+const stelOf = k => dev.stelBuf[k].reduce((a, b) => a + b, 0) / 900;
+const twaOf = k => dev.twaSum[k] / (8 * 3600);
+
+/* ---------- alarm evaluation ---------- */
+function evalAlarms(r) {
+  const c = CONFIG.sensors, A = {};
+  if (now() < dev.suppressUntil || dev.mode !== 'normal') { dev.alarms = {}; return; }
+  A.lelHigh = r.lel >= c.lel.high || dev.lelLock; A.lelLow = !A.lelHigh && r.lel >= c.lel.low;
+  A.o2Low = r.o2 < c.o2.low; A.o2High = r.o2 > c.o2.high;
+  A.coHigh = r.co >= c.co.high; A.coLow = !A.coHigh && r.co >= c.co.low; A.coStel = stelOf('co') >= c.co.stel; A.coTwa = twaOf('co') >= c.co.twa;
+  A.h2sHigh = r.h2s >= c.h2s.high; A.h2sLow = !A.h2sHigh && r.h2s >= c.h2s.low; A.h2sStel = stelOf('h2s') >= c.h2s.stel; A.h2sTwa = twaOf('h2s') >= c.h2s.twa;
+  // latching: all HIGH alarms + O2 deficient stay until acknowledged
+  for (const k of ['lelHigh','o2Low','coHigh','h2sHigh']) { if (A[k]) dev.latched[k] = true; if (dev.latched[k]) A[k] = true; }
+  dev.alarms = A;
+}
+function anyAlarm() { return dev.manualAlert || dev.motionState === 2 || Object.values(dev.alarms).some(Boolean); }
+function alarmSeverity() { const A = dev.alarms; return (A.lelHigh || A.o2Low || A.o2High || A.coHigh || A.h2sHigh || dev.manualAlert || dev.motionState === 2) ? 2 : (anyAlarm() ? 1 : 0); }
+function acknowledge() { // ▲ in normal mode
+  if (dev.manualAlert) { dev.manualAlert = false; return true; }
+  if (dev.motionState === 2) { dev.motionState = 0; dev.lastMotion = now(); return true; }
+  if (!anyAlarm()) return false;
+  // clear latched alarms whose condition has gone; otherwise silence 5 s
+  const r = dev.read, c = CONFIG.sensors;
+  const cond = { lelHigh: r.lel >= c.lel.high || dev.lelLock, o2Low: r.o2 < c.o2.low, coHigh: r.co >= c.co.high, h2sHigh: r.h2s >= c.h2s.high };
+  let cleared = false;
+  for (const k in dev.latched) if (!cond[k]) { delete dev.latched[k]; cleared = true; }
+  if (!cleared || Object.values(cond).some(Boolean)) dev.silencedUntil = now() + CONFIG.t.silence;
+  return true;
+}
+let alarmPhase = 0;
+function alarmOutputs() {
+  const sev = alarmSeverity();
+  if (!sev) return;
+  const period = sev === 2 ? 250 : 500, ph = Math.floor(now() / period);
+  if (ph !== alarmPhase) {
+    alarmPhase = ph;
+    if (ph % 2 === 0) { flashRed(period * 0.6); if (now() > dev.silencedUntil) { beep(period * 0.5, sev === 2 ? 3200 : 2700, 0.3); vibrate(period * 0.5); } }
+  }
+}
+
+/* ---------- main-screen composer ---------- */
+function mainScreen(r) {
+  const s = readingsRow(r); s.icons = S('bat'); s.blink = S();
+  if (settings.bt) s.icons.add('bt');
+  if (now() - settings.bumpedAt < CONFIG.t.bumpValid) s.icons.add('check');
+  if (dev.motionOn) { s.icons.add('motion'); if (Math.floor(now() / 3000) % 3 === 0 || dev.motionState) s.blink.add('motion'); }
+  const A = dev.alarms;
+  if (anyAlarm()) {
+    s.icons.add('warn'); s.blink.add('warn');
+    const hi = A.lelHigh || A.o2High || A.coHigh || A.h2sHigh, lo = A.lelLow || A.o2Low || A.coLow || A.h2sLow;
+    if (hi) { s.icons.add('peak'); s.blink.add('peak'); }
+    if (lo) { s.icons.add('min'); s.blink.add('min'); }
+    if (A.lelHigh || A.lelLow) s.blink.add('r1L'); if (A.o2Low || A.o2High) s.blink.add('r1R');
+    if (A.coHigh || A.coLow || A.coStel || A.coTwa) s.blink.add('r2L'); if (A.h2sHigh || A.h2sLow || A.h2sStel || A.h2sTwa) s.blink.add('r2R');
+    if (A.coStel || A.h2sStel) { s.icons.add('stel'); s.blink.add('stel'); }
+    if (A.coTwa || A.h2sTwa) { s.icons.add('twa'); s.blink.add('twa'); }
+    if (dev.motionState === 2) { s.icons.add('motion'); s.blink.add('motion'); }
+  } else if (dev.motionState === 1) { s.icons.add('motion'); s.blink.add('motion'); }
+  return s;
+}
+
+/* =====================================================================
+   Sequences: startup, FAS, bump, cal, power-off
+   ===================================================================== */
+function runSeq(steps, done) {
+  const id = ++dev.seqId; let i = 0;
+  const next = () => {
+    if (id !== dev.seqId) return;
+    if (i >= steps.length) { done && done(); return; }
+    const st = steps[i++]; if (st.fn) st.fn(); if (st.screen) show(st.screen);
+    later(st.ms, next);
+  };
+  next();
+}
+function fmtTime(d) { let h = d.getHours(); const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return `${String(h).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}${ap}`; }
+const MON = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function fmtDate(d) { return [`${MON[d.getMonth()]}-${String(d.getDate()).padStart(2, '0')}`, String(d.getFullYear())]; }
+
+function powerOn() {
+  ensureAudio(); clearTimers(); dev.power = true; dev.mode = 'startup'; dev.poweredAt = now();
+  dev.read = { lel: 0, o2: 20.8, co: 0, h2s: 0 }; dev.peak = {}; dev.o2min = 20.8; dev.stelBuf = { co: [], h2s: [] }; dev.twaSum = { co: 0, h2s: 0 }; dev.twaN = 0;
+  dev.alarms = {}; dev.latched = {}; dev.manualAlert = false; dev.lelLock = false; dev.motionState = 0; dev.gasApplied = false; dev.discovery = false;
+  backlight(10000);
+  const c = CONFIG.sensors, t = CONFIG.t, d = new Date(), [dm, dy] = fmtDate(d);
+  const lc = new Date(settings.lastCal + 'T12:00:00'), [lcm, lcy] = fmtDate(lc);
+  const bat = S('bat'), withBat = (o) => Object.assign({ icons: bat }, o);
+  const C = () => screenChirp();
+  const steps = [
+    { ms: t.selfTest, screen: { allOn: true, icons: S('warn','peak','min','bt','gas','nogas','hour','check','motion','stel','twa','bat'), flags: S('lel','o2','so2','co','no2','h2s') },
+      fn: () => { selfTestHorn(); vibrate(800); redLeds.forEach(l => l.classList.add('on')); document.getElementById('led-fault').classList.add('on'); document.getElementById('led-bump').classList.add('on-green'); document.getElementById('led-bt').classList.add('on');
+        later(1000, () => { redLeds.forEach(l => l.classList.remove('on')); document.getElementById('led-fault').classList.remove('on'); document.getElementById('led-bump').classList.remove('on-green'); document.getElementById('led-bt').classList.remove('on'); }); } },
+    { ms: 4000, fn: C, screen: withBat(T('MSA', '')) },
+    { ms: 3500, fn: C, screen: withBat(T('ALTAIR', '4XR')) },
+    { ms: 3000, fn: C, screen: withBat(T('REV', CONFIG.fw.rev)) },
+    { ms: 2000, fn: C, screen: withBat(T(CONFIG.fw.fcc[0], CONFIG.fw.fcc[1])) },
+    { ms: 2000, fn: C, screen: withBat(T(CONFIG.fw.ic[0], CONFIG.fw.ic[1])) },
+    { ms: 3000, fn: C, screen: withBat(T('bT SW', CONFIG.fw.bt)) },
+    { ms: 4500, fn: C, screen: { icons: S('bat','hour'), blink: S('hour'), r1: center('SENSOR', 6), r2: center('dSCVRY', 7) } },
+    { ms: 3500, fn: C, screen: withBat({ r1: center('LEL', 6), r2: center(CONFIG.gasType, 7), flags: S('lel') }) },
+    { ms: 3500, fn: C, screen: withBat({ r1: center('UNITS', 6), r2: center('PPM', 7), flags: S('co','h2s') }) },
+    { ms: 3500, fn: C, screen: { icons: S('bat','warn'), r1: center('LOW', 6), r2: center('ALARMS', 7) } },
+    { ms: 2000, fn: C, screen: { icons: S('bat','warn','min'), flags: S('lel','o2','co','h2s'), r1: row1(fmt('lel', c.lel.low), c.o2.low.toFixed(1)), r2: row2(String(c.co.low), String(c.h2s.low)) } },
+    { ms: 3000, fn: C, screen: { icons: S('bat','warn'), r1: center('HIGH', 6), r2: center('ALARMS', 7) } },
+    { ms: 2000, fn: C, screen: { icons: S('bat','warn','peak'), flags: S('lel','o2','co','h2s'), r1: row1(String(c.lel.high), c.o2.high.toFixed(1)), r2: row2(String(c.co.high), String(c.h2s.high)) } },
+    { ms: 3500, fn: C, screen: { icons: S('bat','stel'), flags: S('co','h2s'), r1: center('STEL', 6), r2: row2(String(c.co.stel), String(c.h2s.stel)) } },
+    { ms: 3500, fn: C, screen: { icons: S('bat','twa'), flags: S('co','h2s'), r1: center('TWA', 6), r2: row2(String(c.co.twa), String(c.h2s.twa)) } },
+    { ms: 3500, fn: C, screen: { icons: S('bat','gas'), flags: S('lel','o2','co','h2s'), r1: row1(String(c.lel.cal), c.o2.cal.toFixed(1)), r2: row2(String(c.co.cal), String(c.h2s.cal)) } },
+    { ms: 3000, fn: C, screen: withBat({ r1: center('TIME', 6), r2: fmtTime(d) }) },
+    { ms: 3000, fn: C, screen: withBat(T(dm, dy)) },
+    { ms: 4000, fn: C, screen: { icons: S('bat','gas'), r1: center('LAST', 6), r2: center('CAL', 7) } },
+    { ms: 2500, fn: C, screen: { icons: S('bat','gas'), r1: center(lcm, 6), r2: center(lcy, 7) } },
+  ];
+  if (settings.caldue) { const due = Math.max(0, 180 - Math.floor((d - lc) / 864e5)); steps.push({ ms: 4000, fn: C, screen: withBat(T('CALDUE', `${due} DAY`)) }); }
+  runSeq(steps, fasPrompt);
+}
+
+function fasPrompt() {
+  dev.mode = 'fas?'; screenChirp();
+  later(CONFIG.t.fasWindow, () => { if (dev.mode === 'fas?') enterNormal(); });
+}
+function runFAS() {
+  dev.mode = 'fas'; dev.seqId++; clearTimers();
+  later(CONFIG.t.fasRun, () => {
+    const ok = Math.abs(dev.read.o2 - 20.8) < 1.5 && dev.read.lel < 5 && dev.read.co < 10 && dev.read.h2s < 5;
+    if (ok) { dev.read = { lel: 0, o2: 20.8, co: 0, h2s: 0 }; beep(120); }
+    else { beep(300, 2600, 0.3); }
+    const failed = S(); if (!ok) { if (dev.read.lel >= 5) failed.add('lel'); if (Math.abs(dev.read.o2 - 20.8) >= 1.5) failed.add('o2'); if (dev.read.co >= 10) failed.add('co'); if (dev.read.h2s >= 5) failed.add('h2s'); }
+    dev.mode = 'result'; show({ icons: S('bat'), flags: failed, r1: center('FAS', 6), r2: center(ok ? 'PASS' : 'ERR', 7) });
+    later(CONFIG.t.resultShow, enterNormal);
+  });
+}
+function enterNormal() { dev.seqId++; clearTimers(); dev.mode = 'normal'; dev.page = 'main'; dev.suppressUntil = now() + 3000; dev.lastOpBeep = now(); dev.lastMotion = now(); }
+
+/* pages in normal mode */
+function pageScreen(r) {
+  const c = CONFIG.sensors, bat = S('bat');
+  switch (dev.page) {
+    case 'main': return mainScreen(r);
+    case 'bump': return (Math.floor(now() / 1000) % 2 === 0)
+      ? { icons: S('bat','gas'), flags: S('lel','o2','co','h2s'), r1: center('bUMP', 6), r2: center('TEST?', 7) }
+      : { icons: S('bat','gas'), flags: S('lel','o2','co','h2s'), r1: row1(String(c.lel.cal), c.o2.cal.toFixed(1)), r2: row2(String(c.co.cal), String(c.h2s.cal)) };
+    case 'peak': return { icons: S('bat','peak'), flags: S('lel','o2','co','h2s'), r1: row1(fmt('lel', dev.peak.lel ?? 0), fmt('o2', dev.peak.o2 ?? 20.8)), r2: row2(fmt('co', dev.peak.co ?? 0), fmt('h2s', dev.peak.h2s ?? 0)) };
+    case 'min': return { icons: S('bat','min'), flags: S('o2'), r1: row1('', fmt('o2', dev.o2min)), r2: center('MIN', 7) };
+    case 'stel': return { icons: S('bat','stel'), flags: S('co','h2s'), r1: center('STEL', 6), r2: row2(String(Math.round(stelOf('co'))), String(Math.round(stelOf('h2s')))) };
+    case 'twa': return { icons: S('bat','twa'), flags: S('co','h2s'), r1: center('TWA', 6), r2: row2(String(Math.round(twaOf('co'))), String(Math.round(twaOf('h2s')))) };
+    case 'time': return { icons: bat, r1: center('TIME', 6), r2: fmtTime(new Date()) };
+    case 'date': { const [m, y] = fmtDate(new Date()); return { icons: bat, r1: center(m, 6), r2: center(y, 7) }; }
+    case 'dscvry': return { icons: S('bat','bt'), r1: center('dSCVRY', 6), r2: center(dev.discoveryYes ? 'YES' : 'NO', 7) };
+    case 'motion': return { icons: S('bat','motion'), r1: center('MOTION', 6), r2: center(dev.motionOn ? 'IS ON' : 'IS OFF', 7) };
+    case 'reset': return dev.resetScreen;
+  }
+  return mainScreen(r);
+}
+const PAGE_ORDER = ['main','bump','peak','min','stel','twa','time','date','dscvry','motion'];
+function goPage(p) { dev.page = p; clearTimeout(dev.pageIdleTimer); if (p !== 'main') dev.pageIdleTimer = setTimeout(() => { if (dev.mode === 'normal') dev.page = 'main'; }, CONFIG.t.pageTimeout); }
+function flashReset(label, after) { dev.resetScreen = { icons: S('bat'), r1: center('RESET', 6), r2: center(label, 7) }; const back = dev.page; goPage('reset'); later(1500, () => { after(); goPage(back); }); }
+
+/* bump + calibration */
+function startBump() {
+  dev.mode = 'bump'; dev.seqId++; clearTimers(); dev.gasApplied = true; const t0 = now(); screenChirp();
+  const c = CONFIG.sensors;
+  const check = () => {
+    if (dev.mode !== 'bump') return;
+    const r = dev.read, hit = { lel: r.lel >= c.lel.cal * 0.8, o2: r.o2 <= c.o2.cal + 1.5, co: r.co >= c.co.cal * 0.8, h2s: r.h2s >= c.h2s.cal * 0.8 };
+    const all = Object.values(hit).every(Boolean), el = now() - t0;
+    if ((all && el > CONFIG.t.bumpMin) || el > CONFIG.t.bumpMax) finishBump(all, hit); else later(300, check);
+  };
+  check();
+}
+function finishBump(pass, hit) {
+  dev.gasApplied = false; dev.mode = 'result'; dev.suppressUntil = now() + CONFIG.t.purge;
+  if (pass) { settings.bumpedAt = now(); save(); beep(130, 3200, 0.3); }
+  else { beep(400, 3200, 0.3); }
+  const failed = S(); if (!pass) for (const k in hit) if (!hit[k]) failed.add(k);
+  show({ icons: S('bat', pass ? 'check' : 'warn'), flags: failed, r1: center('bUMP', 6), r2: center(pass ? 'PASS' : 'ERR', 7) });
+  later(3000, () => { if (pass) enterNormal(); else { dev.mode = 'bumperr'; show({ icons: S('bat','warn'), flags: failed, r1: center('bUMP', 6), r2: center('ERR', 7), blink: S('warn') }); } });
+}
+function startCal() { dev.mode = 'zero?'; dev.seqId++; clearTimers(); backlight(); later(CONFIG.t.calTimeout, () => { if (dev.mode === 'zero?') enterNormal(); }); }
+function runZero() {
+  dev.mode = 'refresh'; clearTimers(); screenChirp();
+  later(CONFIG.t.refreshRun, () => { dev.mode = 'zero'; });
+  later(CONFIG.t.refreshRun + CONFIG.t.zeroRun, () => {
+    const ok = dev.read.lel < 5 && Math.abs(dev.read.o2 - 20.8) < 1.5 && dev.read.co < 10 && dev.read.h2s < 5;
+    if (ok) dev.read = { lel: 0, o2: 20.8, co: 0, h2s: 0 };
+    dev.mode = 'result'; beep(ok ? 130 : 400, 3200, 0.3);
+    show({ icons: S('bat'), r1: center('ZERO', 6), r2: center(ok ? 'PASS' : 'ERR', 7) });
+    later(4000, spanPrompt);
+  });
+}
+function spanPrompt() { dev.mode = 'span?'; clearTimers(); later(CONFIG.t.calTimeout, () => { if (dev.mode === 'span?') enterNormal(); }); }
+function runSpan() {
+  dev.mode = 'span'; clearTimers(); dev.gasApplied = true; const t0 = now(); screenChirp(); const c = CONFIG.sensors;
+  const check = () => {
+    if (dev.mode !== 'span') return;
+    const r = dev.read, hit = { lel: r.lel >= c.lel.cal * 0.9, o2: r.o2 <= c.o2.cal + 0.8, co: r.co >= c.co.cal * 0.9, h2s: r.h2s >= c.h2s.cal * 0.9 };
+    const all = Object.values(hit).every(Boolean), el = now() - t0;
+    if ((all && el > CONFIG.t.spanMin) || el > CONFIG.t.spanMax) finishSpan(all, hit); else later(300, check);
+  };
+  check();
+}
+function finishSpan(pass, hit) {
+  dev.gasApplied = false; dev.mode = 'result'; dev.suppressUntil = now() + CONFIG.t.purge;
+  const failed = S(); if (!pass) for (const k in hit) if (!hit[k]) failed.add(k);
+  if (pass) { settings.lastCal = new Date().toISOString().slice(0, 10); settings.bumpedAt = now(); save(); document.getElementById('s-lastcal').value = settings.lastCal; beep(150); }
+  else beep(400, 2600, 0.3);
+  show({ icons: S('bat', pass ? 'check' : 'warn'), flags: failed, r1: center('SPAN', 6), r2: center(pass ? 'PASS' : 'ERR', 7) });
+  later(3000, () => { if (pass) enterNormal(); else { dev.mode = 'spanerr'; show({ icons: S('bat','warn'), flags: failed, r1: center('SPAN', 6), r2: center('ERR', 7), blink: S('warn') }); } });
+}
+
+/* power off */
+function beginOffCountdown() {
+  if (!dev.power || dev.offCountdown) return;
+  const t0 = now(); dev.savedMode = dev.mode; dev.mode = 'off?'; dev.seqId++;
+  dev.offCountdown = setInterval(() => {
+    const left = Math.ceil((CONFIG.t.holdOff - (now() - t0)) / 1000);
+    if (left <= 0) { powerOff(); return; }
+    show({ icons: S('bat'), r1: center('OFF', 6), r2: center(String(left), 7) }); beep(60, 2400, 0.2);
+  }, 1000);
+  show({ icons: S('bat'), r1: center('OFF', 6), r2: center('5', 7) }); beep(60, 2400, 0.2);
+}
+function cancelOffCountdown() { if (dev.offCountdown) { clearInterval(dev.offCountdown); dev.offCountdown = null; if (dev.power) { dev.mode = dev.savedMode === 'off?' ? 'normal' : dev.savedMode; if (dev.mode === 'startup' || dev.mode === 'fas?' || dev.mode === 'fas' || dev.mode === 'result') enterNormal(); } } }
+function powerOff() {
+  clearInterval(dev.offCountdown); dev.offCountdown = null; clearTimers(); dev.seqId++;
+  dev.power = false; dev.mode = 'off'; dev.gasApplied = false; dev.alarms = {}; dev.latched = {}; dev.manualAlert = false; dev.motionOn = false;
+  beep(500, 2400, 0.25); vibrate(200);
+  show({ icons: S(), flags: S(), r1: '', r2: '' });
+}
+
+/* =====================================================================
+   Button handling: press vs hold
+   ===================================================================== */
+function press(btn) {
+  if (!dev.power) return; backlight();
+  const m = dev.mode;
+  if (m === 'fas?') { if (btn === 'power') runFAS(); else if (btn === 'down') enterNormal(); return; }
+  if (m === 'bumperr' || m === 'spanerr') { if (btn === 'up') { dev.mode = 'result'; show({ icons: S('bat'), r1: center('RESET', 6), r2: center('ALARMS', 7) }); later(1500, enterNormal); } return; }
+  if (m === 'zero?') { if (btn === 'power') runZero(); else if (btn === 'down') spanPrompt(); else if (btn === 'up') enterNormal(); return; }
+  if (m === 'span?') { if (btn === 'power') runSpan(); else if (btn === 'down' || btn === 'up') enterNormal(); return; }
+  if (m !== 'normal') return;
+  // normal operation
+  if (btn === 'up' && dev.page === 'main' && acknowledge()) return;
+  const p = dev.page;
+  if (btn === 'down') { const i = PAGE_ORDER.indexOf(p); goPage(PAGE_ORDER[(i + 1) % PAGE_ORDER.length]); return; }
+  if (btn === 'power') {
+    if (p === 'bump') { startBump(); return; }
+    if (p === 'dscvry') { if (dev.discoveryYes) { dev.discovery = true; dev.discoveryUntil = now() + 300000; dev.discoveryYes = false; } goPage('main'); return; }
+    if (p !== 'main') { goPage('main'); }
+    return;
+  }
+  if (btn === 'up') {
+    if (p === 'bump') { goPage('main'); return; }
+    if (p === 'peak') { flashReset('PEAK', () => { dev.peak = {}; }); return; }
+    if (p === 'min') { flashReset('MIN', () => { dev.o2min = dev.read.o2; }); return; }
+    if (p === 'stel') { flashReset('STEL', () => { dev.stelBuf = { co: [], h2s: [] }; }); return; }
+    if (p === 'twa') { flashReset('TWA', () => { dev.twaSum = { co: 0, h2s: 0 }; dev.twaN = 0; }); return; }
+    if (p === 'dscvry') { dev.discoveryYes = !dev.discoveryYes; goPage('dscvry'); return; }
+    if (p === 'motion') { dev.motionOn = !dev.motionOn; dev.lastMotion = now(); dev.motionState = 0; goPage('motion'); return; }
+  }
+}
+function hold(btn) {
+  if (btn === 'power') { if (!dev.power) powerOn(); return; }
+  if (!dev.power || dev.mode !== 'normal') return;
+  backlight();
+  if (btn === 'up' && dev.page === 'main') { startCal(); }
+  if (btn === 'down' && dev.page === 'main') { dev.manualAlert = true; }
+}
+
+const holdTimers = {}; const pressed = {};
+function onDown(btn) {
+  ensureAudio(); pressed[btn] = true; document.getElementById('btn-' + btn).classList.add('down'); backlight(); dev.lastMotion = now();
+  if (btn === 'power') {
+    if (dev.power) { holdTimers.power = setTimeout(() => { holdTimers.power = null; beginOffCountdown(); }, 350); }
+    else holdTimers.power = setTimeout(() => { holdTimers.power = null; hold('power'); }, CONFIG.t.holdOn);
+  } else {
+    const ms = btn === 'up' ? CONFIG.t.holdCal : CONFIG.t.holdAlert;
+    holdTimers[btn] = setTimeout(() => { holdTimers[btn] = null; hold(btn); }, ms);
+  }
+}
+function onUp(btn) {
+  if (!pressed[btn]) return; pressed[btn] = false; document.getElementById('btn-' + btn).classList.remove('down');
+  if (btn === 'power' && dev.offCountdown) { cancelOffCountdown(); return; }
+  if (holdTimers[btn]) { clearTimeout(holdTimers[btn]); holdTimers[btn] = null; press(btn); }
+}
+for (const b of ['down','up','power']) {
+  const n = document.getElementById('btn-' + b);
+  n.addEventListener('pointerdown', e => { e.preventDefault(); n.setPointerCapture(e.pointerId); onDown(b); });
+  n.addEventListener('pointerup', e => { e.preventDefault(); onUp(b); });
+  n.addEventListener('pointercancel', () => onUp(b));
+  n.addEventListener('contextmenu', e => e.preventDefault());
+}
+const KEYS = { ArrowLeft: 'down', ArrowRight: 'up', Enter: 'power', ' ': 'power' };
+window.addEventListener('keydown', e => { const b = KEYS[e.key]; if (!b || e.repeat || e.target.tagName === 'INPUT') return; e.preventDefault(); onDown(b); });
+window.addEventListener('keyup', e => { const b = KEYS[e.key]; if (!b) return; onUp(b); });
+
+/* classroom scenarios (page 47 exercise) */
+dev.scenario = 0;
+const scnBtn = document.getElementById('btn-scn'), scnCap = document.getElementById('scn-caption'), scnReveal = document.getElementById('scn-reveal');
+function scenarioFactor(sc) { return CONFIG.factors[sc.gas][settings.methaneCal ? 'methane' : 'pentane']; }
+function setScenario(n) {
+  dev.scenario = n; scnReveal.hidden = true;
+  if (!n) { dev.atm = { lel: 0, o2: 20.8, co: 0, h2s: 0 }; scnBtn.textContent = 'Scenario'; scnBtn.classList.remove('active'); scnCap.hidden = true; return; }
+  const sc = CONFIG.scenarios[n - 1];
+  dev.atm = { lel: sc.lel, o2: sc.o2, co: sc.co, h2s: sc.h2s };
+  scnBtn.textContent = `Scenario ${n} / ${CONFIG.scenarios.length}`; scnBtn.classList.add('active');
+  scnCap.innerHTML = `<b>Known gas: ${sc.gas}</b><span>${sc.hint}</span>`; scnCap.hidden = false;
+  for (const k of ['lel','o2','co','h2s']) { const i = document.getElementById('g-' + k), o = document.getElementById('o-' + k); if (i) { i.value = dev.atm[k]; o.value = dev.atm[k]; } }
+}
+function revealScenario() {
+  if (!dev.scenario) return;
+  const sc = CONFIG.scenarios[dev.scenario - 1], f = scenarioFactor(sc), t = sc.lel * f;
+  scnReveal.innerHTML = `<b>Answer</b>Meter reads <b>${sc.lel} % LEL</b> &times; ${sc.gas} factor <b>${f.toFixed(2)}</b> (${settings.methaneCal ? 'methane' : 'pentane'} cal) = <b>${t.toFixed(1)} % LEL true</b>${t >= 10 ? ' &mdash; at or above the 10 % action level' : ' &mdash; below 10 %'}.`;
+  scnReveal.hidden = false;
+}
+let scnHold = null, scnHeld = false;
+scnBtn.addEventListener('pointerdown', e => { e.preventDefault(); scnHeld = false; scnHold = setTimeout(() => { scnHeld = true; revealScenario(); }, 700); });
+scnBtn.addEventListener('pointerup', () => { clearTimeout(scnHold); if (!scnHeld) setScenario((dev.scenario + 1) % (CONFIG.scenarios.length + 1)); });
+scnBtn.addEventListener('pointercancel', () => clearTimeout(scnHold));
+scnBtn.addEventListener('contextmenu', e => e.preventDefault());
+scnReveal.addEventListener('click', () => { scnReveal.hidden = true; });
+window.addEventListener('keydown', e => { if (e.key === 's' || e.key === 'S') { if (e.target.tagName !== 'INPUT') setScenario((dev.scenario + 1) % (CONFIG.scenarios.length + 1)); } if (e.key === 'a' || e.key === 'A') revealScenario(); });
+
+/* motion sensing for MotionAlert */
+window.addEventListener('devicemotion', e => { const a = e.accelerationIncludingGravity || e.acceleration; if (!a) return; const mag = Math.hypot(a.x || 0, a.y || 0, a.z || 0); if (window._lastMag != null && Math.abs(mag - window._lastMag) > 0.6) dev.lastMotion = now(); window._lastMag = mag; });
+
+/* =====================================================================
+   Main loop
+   ===================================================================== */
+let lastTick = performance.now(), lastSecond = 0;
+function loop() {
+  const tnow = performance.now(), dt = Math.min(0.5, (tnow - lastTick) / 1000); lastTick = tnow;
+  const lit = dev.power && now() < dev.backlightUntil; document.getElementById('lcdbg').classList.toggle('lit', lit); document.getElementById('lcdlight').classList.toggle('lit', lit);
+  if (dev.power) {
+    const r = tickReadings(dt);
+    if (Math.floor(tnow / 1000) !== lastSecond) { lastSecond = Math.floor(tnow / 1000); if (dev.mode === 'normal') exposureTick(r); }
+    const m = dev.mode;
+    if (m === 'normal') {
+      evalAlarms(r);
+      // MotionAlert
+      if (dev.motionOn) { const idle = now() - dev.lastMotion; if (dev.motionState < 2 && idle > CONFIG.t.motionFull) { dev.motionState = 2; } else if (dev.motionState === 0 && idle > CONFIG.t.motionPre) dev.motionState = 1; else if (dev.motionState === 1 && idle < CONFIG.t.motionPre) dev.motionState = 0; }
+      if (dev.motionState === 1 && Math.floor(now() / 1000) !== window._preBeep) { window._preBeep = Math.floor(now() / 1000); beep(60, 2600, 0.2); }
+      if (anyAlarm()) { backlight(3000); alarmOutputs(); }
+      else if (settings.beep && now() - dev.lastOpBeep > CONFIG.t.opBeep) { dev.lastOpBeep = now(); chirp(); }
+      // bump LED
+      if (now() - dev.lastBumpLed > CONFIG.t.bumpLed) { dev.lastBumpLed = now(); const led = document.getElementById('led-bump'); const good = now() - settings.bumpedAt < CONFIG.t.bumpValid; led.classList.add(good ? 'on-green' : 'on-red'); setTimeout(() => led.classList.remove('on-green', 'on-red'), 300); }
+      if (dev.discovery && now() > dev.discoveryUntil) dev.discovery = false;
+      document.getElementById('led-bt').classList.toggle('on', dev.discovery && Math.floor(now() / 150) % 2 === 0);
+      show(pageScreen(r));
+    } else if (m === 'fas?') {
+      show((Math.floor(now() / 1000) % 2 === 0) ? { icons: S('bat','nogas'), flags: S('lel','o2','co','h2s'), r1: center('FAS?', 6), r2: '' } : { icons: S('bat','nogas'), ...readingsRow(r) });
+    } else if (m === 'fas') {
+      show({ icons: S('bat','nogas','hour'), blink: S('hour'), ...readingsRow(r) });
+    } else if (m === 'bump') {
+      show({ icons: S('bat','gas','hour'), blink: S('hour'), ...readingsRow(r) });
+    } else if (m === 'zero?') {
+      show({ icons: S('bat','nogas'), flags: S('lel','o2','co','h2s'), r1: center('ZERO', 6), r2: center('CAL?', 7) });
+    } else if (m === 'refresh') {
+      show({ icons: S('bat','nogas','hour'), blink: S('hour'), r1: center('SENSOR', 6), r2: center('REFRSH', 7) });
+    } else if (m === 'zero') {
+      show({ icons: S('bat','nogas','hour'), blink: S('hour'), ...readingsRow(r) });
+    } else if (m === 'span?') {
+      const c = CONFIG.sensors;
+      show((Math.floor(now() / 1000) % 2 === 0) ? { icons: S('bat','gas'), flags: S('lel','o2','co','h2s'), r1: center('SPAN', 6), r2: center('CAL?', 7) }
+        : { icons: S('bat','gas'), flags: S('lel','o2','co','h2s'), r1: row1(String(c.lel.cal), c.o2.cal.toFixed(1)), r2: row2(String(c.co.cal), String(c.h2s.cal)) });
+    } else if (m === 'span') {
+      show({ icons: S('bat','gas','hour'), blink: S('hour'), ...readingsRow(r) });
+    } else {
+      paint(dev.screen); // static screens (startup, results, countdown) still need blink refresh
+    }
+  }
+  requestAnimationFrame(loop);
+}
+show({ icons: S(), r1: '', r2: '' });
+requestAnimationFrame(loop);
+
+/* =====================================================================
+   Side chrome: help + settings
+   ===================================================================== */
+const sheets = { help: document.getElementById('help'), settings: document.getElementById('settings') };
+function openSheet(k) { for (const s in sheets) sheets[s].classList.toggle('open', s === k); }
+document.getElementById('btn-help').onclick = () => openSheet(sheets.help.classList.contains('open') ? null : 'help');
+document.getElementById('btn-settings').onclick = () => openSheet(sheets.settings.classList.contains('open') ? null : 'settings');
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => openSheet(null));
+{ const tb = document.querySelector('#factor-table tbody'); for (const g in CONFIG.factors) { const tr = document.createElement('tr'); tr.innerHTML = `<td>${g}</td><td>${CONFIG.factors[g].pentane.toFixed(2)}</td><td>${CONFIG.factors[g].methane.toFixed(2)}</td>`; tb.appendChild(tr); } }
+const bind = (id, key) => { const n = document.getElementById(id); n.checked = !!settings[key]; n.onchange = () => { settings[key] = n.checked; save(); }; };
+bind('s-sound', 'sound'); bind('s-vib', 'vib'); bind('s-beep', 'beep'); bind('s-bt', 'bt'); bind('s-caldue', 'caldue'); bind('s-methane', 'methaneCal');
+document.getElementById('s-methane').addEventListener('change', () => { applyCalType(); if (dev.scenario) setScenario(dev.scenario); });
+const lc = document.getElementById('s-lastcal'); lc.value = settings.lastCal; lc.onchange = () => { if (lc.value) { settings.lastCal = lc.value; save(); } };
+document.getElementById('s-clearbump').onclick = () => { settings.bumpedAt = 0; save(); };
+for (const k of ['lel','o2','co','h2s']) {
+  const inp = document.getElementById('g-' + k), out = document.getElementById('o-' + k);
+  inp.oninput = () => { dev.atm[k] = parseFloat(inp.value); out.value = inp.value; };
+}
+document.getElementById('g-fresh').onclick = () => { dev.atm = { lel: 0, o2: 20.8, co: 0, h2s: 0 }; for (const k of ['lel','o2','co','h2s']) { document.getElementById('g-' + k).value = dev.atm[k]; document.getElementById('o-' + k).value = dev.atm[k]; } };
+</script>
